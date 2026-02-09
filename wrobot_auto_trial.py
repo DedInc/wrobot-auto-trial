@@ -10,6 +10,25 @@ from pywinauto.application import Application
 
 WROBOT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "WRobot.exe")
 
+# Background thread to auto-dismiss "Trial version" popups
+def trial_popup_monitor():
+    """Continuously monitors for and dismisses 'Trial version' popups without stealing focus."""
+    while True:
+        try:
+            windows_found = pywinauto.findwindows.find_windows(title="Trial version")
+            for hwnd in windows_found:
+                try:
+                    window_title = win32gui.GetWindowText(hwnd)
+                    print(f"Found Trial version popup: '{window_title}' (HWND: {hwnd})")
+                    # Send WM_CLOSE without stealing focus
+                    win32gui.PostMessage(hwnd, 0x0010, 0, 0)  # WM_CLOSE
+                    print("Dismissed Trial version popup (no focus steal)!")
+                except Exception as e:
+                    print(f"Error handling Trial version popup {hwnd}: {e}")
+        except Exception:
+            pass  # Silently continue if no windows found
+        time.sleep(1)  # Check every second
+
 def find_process_by_name(process_name):
     for proc in psutil.process_iter(['pid', 'name']):
         if proc.info['name'] == process_name:
@@ -17,6 +36,11 @@ def find_process_by_name(process_name):
     return None
 
 def main():
+    # Start background thread to monitor and dismiss trial popups
+    trial_monitor_thread = threading.Thread(target=trial_popup_monitor, daemon=True)
+    trial_monitor_thread.start()
+    print("Started Trial version popup monitor thread.")
+
     process_name = "WRobot.exe"
     while True:
         wrobot_process = find_process_by_name(process_name)
