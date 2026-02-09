@@ -2,9 +2,11 @@ import subprocess
 import os
 import time
 import threading
+import logging
 
 import psutil
 import win32gui
+import win32con
 import pywinauto
 from pywinauto.application import Application
 
@@ -21,21 +23,35 @@ def trial_popup_monitor():
                     window_title = win32gui.GetWindowText(hwnd)
                     print(f"Found Trial version popup: '{window_title}' (HWND: {hwnd})")
                     # Send WM_CLOSE without stealing focus
-                    win32gui.PostMessage(hwnd, 0x0010, 0, 0)  # WM_CLOSE
+                    win32gui.PostMessage(hwnd, win32con.WM_CLOSE, 0, 0)
                     print("Dismissed Trial version popup (no focus steal)!")
                 except Exception as e:
                     print(f"Error handling Trial version popup {hwnd}: {e}")
-        except Exception:
-            pass  # Silently continue if no windows found
+        except Exception as e:
+            logging.debug("find_windows failed: %s", e, exc_info=True)
         time.sleep(1)  # Check every second
 
 def find_process_by_name(process_name):
+    """Find a running process by its name.
+
+    Args:
+        process_name: The name of the process to find (e.g., 'WRobot.exe').
+
+    Returns:
+        The psutil.Process object if found, otherwise None.
+    """
     for proc in psutil.process_iter(['pid', 'name']):
         if proc.info['name'] == process_name:
             return proc
     return None
 
 def main():
+    """Main entry point for the WRobot auto-trial manager.
+
+    Starts a background thread to monitor and dismiss trial popups,
+    then continuously monitors for the WRobot process, starting it if
+    not running, and automating the login and bot launch sequence.
+    """
     # Start background thread to monitor and dismiss trial popups
     trial_monitor_thread = threading.Thread(target=trial_popup_monitor, daemon=True)
     trial_monitor_thread.start()
@@ -127,7 +143,7 @@ def main():
                                 try:
                                     window_title = win32gui.GetWindowText(hwnd)
                                     print(f"Closing window: '{window_title}' (HWND: {hwnd})")
-                                    win32gui.PostMessage(hwnd, 0x0010, 0, 0)
+                                    win32gui.PostMessage(hwnd, win32con.WM_CLOSE, 0, 0)
                                     print("Sent WM_CLOSE message to captcha window!")
                                 except Exception as e: print(f"Error closing window {hwnd}: {e}")
                         else: print("No MessageBox windows found to close")
